@@ -163,17 +163,27 @@
             const cfg = window.MK_FILTER_CONFIG;
             let globalContinuousFilteredCount = 0;
 
+            if (cfg.debug) console.log('[MK Filter] Script Injected. Config:', cfg);
+
             function isNoteAllowed(note) {
                 try {
                     if (!note) return true;
                     const user = note.renote?.user || note.user;
                     const host = (user?.host || '').toLowerCase();
+
+                    // 处理本地贴 (host 为空)
                     if (!host) {
-                        if (cfg.hideLocal) return false;
+                        if (cfg.hideLocal) {
+                            if (cfg.debug) console.log(`[MK Filter] 🚫 Blocked Local Post: @${user.username}`);
+                            return false;
+                        }
                         return true;
                     }
+
+                    // 处理远程贴
                     const isAllowed = cfg.allowedInstances.includes(host);
                     if (!isAllowed) {
+                        if (cfg.debug) console.log(`[MK Filter] 🚫 Blocked: @${user.username}@${host}`);
                         window.dispatchEvent(new CustomEvent('mk-filter-blocked-event', {detail: host}));
                     }
                     return isAllowed;
@@ -194,6 +204,7 @@
                 }];
             }
 
+            // WebSocket Filtering
             const WS_Proto = window.WebSocket.prototype;
             const originalAddEventListener = WS_Proto.addEventListener;
             WS_Proto.addEventListener = function (type, listener, options) {
@@ -213,10 +224,13 @@
                 return originalAddEventListener.call(this, type, listener, options);
             };
 
+            // Fetch API Filtering
             const originalFetch = window.fetch;
             window.fetch = async function (...args) {
                 const url = typeof args[0] === 'string' ? args[0] : args[0].url;
                 if (!url || !url.includes('/api/notes/') || !url.includes('-timeline')) return originalFetch(...args);
+
+                if (cfg.debug) console.log(`[MK Filter] 🛰️ Intercepting Timeline Fetch: ${url}`);
 
                 let isRefreshRequest = false;
                 try {
@@ -238,14 +252,21 @@
                     if (!Array.isArray(data)) return response;
 
                     const filtered = data.filter(isNoteAllowed);
+
                     if (filtered.length > 0) {
+                        if (cfg.debug) console.log(`[MK Filter] ✅ Passed ${filtered.length}/${data.length} notes.`);
                         globalContinuousFilteredCount = 0;
                         return new Response(JSON.stringify(filtered), {status: 200, headers: response.headers});
                     }
-                    if (isRefreshRequest) return new Response(JSON.stringify([]), {status: 200, headers: response.headers});
 
-                    if (data.length > 0 && currentReqPageCount < cfg.maxAutoFetchPages) {
+                    if (isRefreshRequest) {
+                        if (cfg.debug) console.log(`[MK Filter] ⏳ Refresh yielded 0 results after filtering. Silencing.`);
+                        return new Response(JSON.stringify([]), {status: 200, headers: response.headers});
+                    }
+
+                    if (data.length > 0 && currentReqPageCount <= cfg.maxAutoFetchPages) {
                         const lastId = data[data.length - 1].id;
+                        if (cfg.debug) console.log(`[MK Filter] 🔄 Page ${currentReqPageCount} empty after filtering. Auto-fetching next... (untilId: ${lastId})`);
                         const nextArgs = [...fArgs];
                         try {
                             const body = JSON.parse(nextArgs[1].body);
@@ -259,10 +280,12 @@
                     if (data.length > 0) {
                         globalContinuousFilteredCount += currentReqPageCount;
                         const lastId = data[data.length - 1].id;
+                        if (cfg.debug) console.log(`[MK Filter] 🛑 Max auto-fetch reached. Displaying placeholder.`);
                         return new Response(JSON.stringify(createPlaceholder(lastId, globalContinuousFilteredCount)), {status: 200, headers: response.headers});
                     }
                     return response;
                 };
+
                 return fetchLoop(args, 1);
             };
         }
