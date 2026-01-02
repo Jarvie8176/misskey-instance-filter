@@ -27,7 +27,7 @@
 
 1. **安装用户脚本管理器**: 推荐使用 [Tampermonkey](https://www.tampermonkey.net/)。
 2. **安装脚本**:
-   > **[点击此处从 GreasyFork 安装](https://greasyfork.org/scripts/XXXXX)** *(请替换为实际发布的链接)*
+   > **[点击此处从 GreasyFork 安装](https://greasyfork.org/zh-CN/scripts/561182-misskey-timeline-instance-filter)** 
 3. **刷新页面**: 安装后打开任意 Misskey 实例，右下角将出现 **⚙️** 悬浮按钮。
 
 ## ⚙️ 选项说明

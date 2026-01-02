@@ -31,7 +31,7 @@ only content from instances on the list will be displayed.
 1. **Install a Userscript Manager**: [Tampermonkey](https://www.tampermonkey.net/) is recommended.
 2. **Install the Script**:
 
-> **[Click here to install from GreasyFork](https://greasyfork.org/scripts/XXXXX)** *(Please replace with the actual release link)*
+> **[Click here to install from GreasyFork](https://greasyfork.org/en/scripts/561182-misskey-timeline-instance-filter)**
 
 3. **Refresh the Page**: After installation, open any Misskey instance. A **⚙️** floating button will appear in the bottom right corner.
 

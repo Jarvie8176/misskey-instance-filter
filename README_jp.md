@@ -29,7 +29,7 @@
 1. **ユーザースクリプトマネージャーのインストール**: [Tampermonkey](https://www.tampermonkey.net/) の使用を推奨します。
 2. **スクリプトのインストール**:
 
-> **[ここをクリックして GreasyFork からインストール](https://greasyfork.org/scripts/XXXXX)** *(実際の公開リンクに置き換えてください)*
+> **[ここをクリックして GreasyFork からインストール](https://greasyfork.org/ja/scripts/561182-misskey-timeline-instance-filter)**
 
 3. **ページの更新**: インストール後、任意の Misskey インスタンスを開くと、右下に **⚙️** (設定) フローティングボタンが表示されます。
 
