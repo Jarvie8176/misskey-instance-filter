@@ -3,7 +3,7 @@
 // @name:zh-CN   Misskey 实例过滤器 (全局流/白名单)
 // @name:ja      Misskey タイムライン インスタンス フィルター
 // @namespace    https://github.com/Jarvie8176/misskey-instance-filter
-// @version      1.0.0
+// @version      1.1.0
 // @description  Filter Misskey global timeline by instances
 // @author       JarvieK
 // @license      MIT
@@ -24,7 +24,8 @@
         maxPages: 5,
         instanceList: '',
         debug: true,
-        wildcardSearch: false
+        wildcardSearch: false,
+        hideLocal: false // 新增：默认不隐藏本地
     };
 
     const TRANSLATIONS = {
@@ -33,6 +34,7 @@
             listPlaceholder: "one.domain.per.line",
             maxPagesLabel: "Max Auto-Fetch:",
             debugLabel: "Debug Mode:",
+            hideLocalLabel: "Hide Local Feed:",
             langLabel: "Language:",
             saveBtn: "Save & Reload",
             cancelBtn: "Cancel",
@@ -52,6 +54,7 @@
             listPlaceholder: "每行一个域名 (例如: misskey.io)",
             maxPagesLabel: "自动翻页上限:",
             debugLabel: "调试模式:",
+            hideLocalLabel: "隐藏本地内容:",
             langLabel: "界面语言:",
             saveBtn: "保存并重载",
             cancelBtn: "取消",
@@ -71,6 +74,7 @@
             listPlaceholder: "1行に1つのドメイン (例: misskey.io)",
             maxPagesLabel: "自動取得上限:",
             debugLabel: "デバッグモード:",
+            hideLocalLabel: "ローカルを非表示:",
             langLabel: "表示言語:",
             saveBtn: "保存して再読み込み",
             cancelBtn: "キャンセル",
@@ -88,48 +92,22 @@
     };
 
     const i18n = getCurrentI18n();
-
     const TARGET_META = 'meta[name="application-name"][content="Misskey"]';
 
-    // 检查页面是否包含指定的 Meta 标签
     function hasMisskeyMeta() {
         return !!document.querySelector(TARGET_META);
     }
 
-    // 启动脚本的主入口
     function init() {
-        // 防止重复注入
         if (window.__MK_FILTER_LOADED__) return;
         window.__MK_FILTER_LOADED__ = true;
-
         inject();
     }
 
-    // 1. 如果当前已经是 Misskey (Meta标签已存在)，立即启动
     if (hasMisskeyMeta()) {
         init();
         return;
     }
-
-    // 2. 如果是 document-start，Meta 标签可能还没加载出来
-    // 使用 MutationObserver 监听 <head> 的变化
-    const observer = new MutationObserver((mutations) => {
-        if (hasMisskeyMeta()) {
-            observer.disconnect(); // 找到了，停止监听
-            init();                // 启动脚本
-        }
-    });
-
-    // 开始监听 document 的变化
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
-
-    // 3. 设置超时保护：如果 5 秒内还没检测到 Meta 标签，就停止监听，释放资源
-    setTimeout(() => {
-        observer.disconnect();
-    }, 5000);
 
     function getCurrentI18n() {
         const savedLang = GM_getValue('mk_filter_lang', DEFAULT_SETTINGS.lang);
@@ -163,10 +141,14 @@
             allowedInstances: GM_getValue('mk_filter_list', DEFAULT_SETTINGS.instanceList).split('\n').map(l => l.trim().toLowerCase()).filter(Boolean),
             maxAutoFetchPages: parseInt(GM_getValue('mk_filter_max_pages', DEFAULT_SETTINGS.maxPages), 10),
             debug: isDebug,
+            hideLocal: GM_getValue('mk_filter_hide_local', DEFAULT_SETTINGS.hideLocal), // 传入配置
             localHost: localHost,
             labels: i18n
         };
-        if (!config.allowedInstances.includes(localHost)) config.allowedInstances.push(localHost);
+        // 只有在不隐藏本地的情况下，才自动把当前实例加入白名单
+        if (!config.hideLocal && !config.allowedInstances.includes(localHost)) {
+            config.allowedInstances.push(localHost);
+        }
 
         const configJSON = JSON.stringify(config);
 
@@ -181,11 +163,21 @@
                     if (!note) return true;
                     const user = note.renote?.user || note.user;
                     const host = (user?.host || '').toLowerCase();
-                    if (!host) return true;
+
+                    // 处理本地贴 (host 为空)
+                    if (!host) {
+                        if (cfg.hideLocal) {
+                            if (cfg.debug) console.log(`[MK Filter] 🚫 Blocked Local Post: @${user.username}`);
+                            return false;
+                        }
+                        return true;
+                    }
+
+                    // 处理远程贴
                     const isAllowed = cfg.allowedInstances.includes(host);
                     if (!isAllowed) {
                         if (cfg.debug) console.log(`[MK Filter] 🚫 Blocked: @${user.username}@${host}`);
-                        window.dispatchEvent(new CustomEvent('mk-filter-blocked-event', {detail: host}));
+                        window.dispatchEvent(new CustomEvent('mk-filter-blocked-event', { detail: host }));
                     }
                     return isAllowed;
                 } catch (e) {
@@ -257,12 +249,12 @@
                     if (filtered.length > 0) {
                         if (cfg.debug) console.log(`[MK Filter] ✅ Passed ${filtered.length}/${data.length} notes.`);
                         globalContinuousFilteredCount = 0;
-                        return new Response(JSON.stringify(filtered), {status: 200, headers: response.headers});
+                        return new Response(JSON.stringify(filtered), { status: 200, headers: response.headers });
                     }
 
                     if (isRefreshRequest) {
                         if (cfg.debug) console.log(`[MK Filter] ⏳ Refresh yielded 0 results after filtering. Silencing.`);
-                        return new Response(JSON.stringify([]), {status: 200, headers: response.headers});
+                        return new Response(JSON.stringify([]), { status: 200, headers: response.headers });
                     }
 
                     if (data.length > 0 && currentReqPageCount <= cfg.maxAutoFetchPages) {
@@ -282,7 +274,7 @@
                         globalContinuousFilteredCount += currentReqPageCount;
                         const lastId = data[data.length - 1].id;
                         if (cfg.debug) console.log(`[MK Filter] 🛑 Max auto-fetch reached. Displaying placeholder.`);
-                        return new Response(JSON.stringify(createPlaceholder(lastId, globalContinuousFilteredCount)), {status: 200, headers: response.headers});
+                        return new Response(JSON.stringify(createPlaceholder(lastId, globalContinuousFilteredCount)), { status: 200, headers: response.headers });
                     }
                     return response;
                 };
@@ -448,6 +440,7 @@
                 GM_setValue('mk_filter_list', listInput.value);
                 GM_setValue('mk_filter_max_pages', document.getElementById('mk-f-pages').value);
                 GM_setValue('mk_filter_debug', document.getElementById('mk-f-debug-toggle').checked);
+                GM_setValue('mk_filter_hide_local', document.getElementById('mk-f-hide-local-toggle').checked);
                 GM_setValue('mk_filter_lang', document.getElementById('mk-f-lang').value);
                 GM_setValue('mk_filter_wildcard', wildcardToggle.checked);
                 window.location.reload();
