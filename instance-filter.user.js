@@ -92,7 +92,14 @@
     };
 
     const i18n = getCurrentI18n();
+
     const TARGET_META = 'meta[name="application-name"][content="Misskey"]';
+
+    if (hasMisskeyMeta()) {
+        init();
+    }
+
+    // ============== end of entrypoint ==============
 
     function hasMisskeyMeta() {
         return !!document.querySelector(TARGET_META);
@@ -102,19 +109,6 @@
         if (window.__MK_FILTER_LOADED__) return;
         window.__MK_FILTER_LOADED__ = true;
         inject();
-    }
-
-    if (hasMisskeyMeta()) {
-        init();
-    } else {
-        const observer = new MutationObserver((mutations) => {
-            if (hasMisskeyMeta()) {
-                observer.disconnect();
-                init();
-            }
-        });
-        observer.observe(document.documentElement, {childList: true, subtree: true});
-        setTimeout(() => observer.disconnect(), 5000);
     }
 
     function getCurrentI18n() {
@@ -315,6 +309,9 @@
                 .mk-f-btns button{flex:1;padding:8px;border:none;border-radius:6px;cursor:pointer;font-weight:bold}
                 #mk-f-save{background:#28a745;color:#fff}
                 #mk-f-cancel{background:#6c757d;color:#fff}
+                .mk-f-footer{margin-top:12px;display:flex;justify-content:center;gap:15px;opacity:0.6;font-size:11px}
+                .mk-f-footer a{color:inherit;text-decoration:none;display:flex;align-items:center;gap:4px}
+                .mk-f-footer a:hover{opacity:1;text-decoration:underline}
             `);
 
             const div = document.createElement('div');
@@ -361,6 +358,10 @@
                         <button id="mk-f-save">${i18n.saveBtn}</button>
                         <button id="mk-f-cancel">${i18n.cancelBtn}</button>
                     </div>
+                    <div class="mk-f-footer">
+                        <a href="https://github.com/Jarvie8176/misskey-instance-filter" target="_blank">📦 GitHub</a>
+                        <a href="https://ko-fi.com/jk433552" target="_blank">☕ Ko-fi</a>
+                    </div>
                 </div>
             `;
             document.body.appendChild(div);
@@ -397,6 +398,7 @@
 
             searchInput.oninput = renderBlocked;
             wildcardToggle.onchange = renderBlocked;
+            listInput.oninput = renderBlocked;
 
             window.addEventListener('mk-filter-blocked-event', (e) => {
                 const domain = e.detail;
