@@ -1,75 +1,87 @@
-# Misskey 实例过滤器 (Timeline Instance Filter)
-
-这是一个为 Misskey 设计的浏览器用户脚本 (Userscript)，它可以让你在浏览全局时间线 (GTL) 或社交时间线 (STL) 时，只看你感兴趣的实例（服务器）上的内容。
-
-如果你觉得时间线上无关信息太多，只想关注特定圈子的讨论，这个脚本会非常有用。它通过一个“白名单”系统工作，只有在名单上的实例发布的内容才会被显示。
-
-> **给极度注重隐私用户的建议**（[隐私说明](#privacy)）：
-> 如果您不希望脚本在所有网站运行，您可以手动在脚本管理器（Tampermonkey）的设置页面，将“用户匹配 (User Matches)”修改为您常用的 Misskey 实例域名。但这会导致脚本失去自动识别新实例的能力。
-
-## ✨ 主要功能
-
-* **实例白名单过滤**: 只有你手动添加到名单中的实例内容才会被显示。
-* **隐藏本地内容**: 提供独立开关，你可以选择隐藏当前所在实例的帖子，专注于探索外部实例。
-* **智能翻页加载**: 当一整页内容都被过滤掉时，脚本会自动加载下一页，直到找到符合条件的帖子或者达到设定的上限（最高 10 页），避免了手动滚动的烦恼。
-* **最近拦截列表 & 实时联动**:
-    * 脚本会自动记录最近被拦截的实例域名。
-    * **实时反馈**：当你在白名单编辑框中输入域名时，下方的拦截列表会实时刷新，自动移除已加入白名单的域名。
-* **通配符搜索**: 支持在“最近拦截列表”中使用 `*` 通配符（如 `*.jp`）快速定位特定后缀的实例。
-* **多语言支持**: 界面支持简体中文、日文和英文，并可自动检测浏览器语言。
-* **轻量化设计**: 仅在识别到 Misskey 实例时运行，不占用多余系统资源。
-
-## 🔧 如何安装
-
-1. **安装用户脚本管理器**: 推荐使用 [Tampermonkey](https://www.tampermonkey.net/)。
-2. **安装脚本**:
-   > **[点击此处从 GreasyFork 安装](https://greasyfork.org/scripts/XXXXX)** *(请替换为实际发布的链接)*
-3. **刷新页面**: 安装后打开任意 Misskey 实例，右下角将出现 **⚙️** 悬浮按钮。
-
-## ⚙️ 选项说明
-
-* **实例白名单列表**: 每行输入一个域名（如 `misskey.io`）。
-* **最近拦截的实例**: 显示最近被隐藏的来源。点击 **“添加 +”** 可快速将该实例加入白名单。
-* **隐藏本地内容**:
-    * **关闭（默认）**：显示当前实例内容 + 白名单实例内容。
-    * **开启**：隐藏所有本地帖子，仅显示白名单中的远程实例内容。
-* **自动翻页上限**: 设定脚本在内容稀疏时连续自动抓取的最大页数（0-10）。
-* **调试模式**: 开启后可在浏览器控制台（F12）查看详细的过滤日志。
-
-<a name="privacy"></a>
-
-## 🛡️ 权限与隐私说明
-
-### 为什么需要 "访问所有网站" 的权限？
-
-由于 Misskey 实例分布在成千上万个不同的域名下，脚本需要通过读取网页头部的 `meta` 标签来确认当前网站是否为 Misskey。
-
-1. **静默检测**: 脚本仅在页面加载时检测一次。如果当前网站不是 Misskey，脚本会立即彻底终止运行。
-2. **零数据上传**: 所有过滤逻辑和白名单数据均保存在您的浏览器本地（`GM_setValue`），**绝不会**向任何服务器上传您的浏览记录或个人信息。
-3. **完全开源**: 您可以随时在 GitHub 上查看并审计本脚本的每一行源代码。
-
-## 🔗 项目链接
-
-如果您觉得这个脚本有帮助，欢迎通过以下方式支持：
-
-* **项目主页**: [📦 GitHub Repository](https://github.com/Jarvie8176/misskey-instance-filter)
-* **问题反馈**: [🐛 提交 Issue](https://github.com/Jarvie8176/misskey-instance-filter/issues)
-* **支持作者**: [☕ 在 Ko-fi 上请我喝杯咖啡](https://ko-fi.com/jk433552)
-
-## ❓ 常见问题 (FAQ)
-
-**问: 什么是“实例”？**
-答: Misskey 是一个去中心化的社交网络，由许多独立的服务器（网站）组成，这些服务器就叫做“实例”。用户可以在不同的实例上注册，但它们之间可以相互交流。全局时间线（GTL）会显示来自不同实例的公开帖子。
-
-**问: 这个脚本会影响我关注的人的帖子吗？**
-答: 不会。这个脚本主要作用于全局时间线 (GTL) 和社交时间线 (STL)。它不会过滤你的主页时间线 (HTL)、列表或你直接访问用户个人主页时看到的内容。
-
-**问: 我添加了白名单，但感觉时间线上的帖子变少了？**
-答: 这是正常现象。因为脚本已经为你过滤掉了所有不在白名单上的实例内容。如果觉得内容太少，可以尝试通过“最近拦截的实例”功能，发现并添加更多你感兴趣的实例到白名单中。
-
-**问: 我可以临时禁用这个脚本吗？**
-答: 可以。在浏览器的 Tampermonkey 扩展菜单中，可以找到已安装的脚本列表，在那里可以暂时关闭“Misskey 实例过滤器”。
+[中文](./README.md) | [English](./README_en.md) | [日本語](./README_jp.md)
 
 ---
 
-*License: [MIT](https://github.com/Jarvie8176/misskey-instance-filter/blob/main/LICENSE)*
+# Misskey Timeline Instance Filter
+
+This is a browser userscript designed for Misskey. It allows you to view content only from instances (servers) you are interested in when browsing the Global Timeline (GTL) or Social Timeline (STL).
+
+If you feel there is too much irrelevant noise on the timeline and only want to focus on discussions from specific circles, this script will be very useful. It works via a "Whitelist" system, where
+only content from instances on the list will be displayed.
+
+> **Suggestion for Privacy-Conscious Users** ([Privacy Note](#privacy)):
+> If you do not wish for the script to run on all websites, you can manually modify the "User Matches" in your script manager (Tampermonkey) settings to the specific Misskey instance domains you
+> frequent. However, this will cause the script to lose the ability to automatically identify new instances.
+
+## ✨ Key Features
+
+* **Instance Whitelist Filtering**: Only content from instances you manually add to the list will be displayed.
+* **Hide Local Content**: Provides an independent switch to hide posts from the current instance, allowing you to focus on exploring external instances.
+* **Smart Auto-Pagination**: When an entire page of content is filtered out, the script automatically loads the next page until it finds posts that match your criteria or reaches the set limit (up to
+  10 pages), saving you from the hassle of manual scrolling.
+* **Recent Blocked List & Real-time Interaction**:
+    * The script automatically records instance domains that were recently blocked.
+* **Real-time Feedback**: When you type a domain into the whitelist edit box, the blocked list below refreshes in real-time, automatically removing domains that have just been added to the whitelist.
+* **Wildcard Search**: Supports using the `*` wildcard (e.g., `*.jp`) in the "Recent Blocked List" to quickly locate instances with specific suffixes.
+* **Multi-language Support**: The interface supports Simplified Chinese, Japanese, and English, and automatically detects your browser language.
+* **Lightweight Design**: Runs only when a Misskey instance is detected, without consuming excess system resources.
+
+## 🔧 Installation
+
+1. **Install a Userscript Manager**: [Tampermonkey](https://www.tampermonkey.net/) is recommended.
+2. **Install the Script**:
+
+> **[Click here to install from GreasyFork](https://greasyfork.org/scripts/XXXXX)** *(Please replace with the actual release link)*
+
+3. **Refresh the Page**: After installation, open any Misskey instance. A **⚙️** floating button will appear in the bottom right corner.
+
+## ⚙️ Options Explained
+
+* **Instance Whitelist**: Enter one domain per line (e.g., `misskey.io`).
+* **Recently Blocked Instances**: Shows sources that were recently hidden. Click **"Add +"** to quickly add that instance to your whitelist.
+* **Hide Local Content**:
+    * **Off (Default)**: Shows content from the current instance + whitelist instances.
+    * **On**: Hides all local posts, displaying only remote content from the whitelist.
+* **Auto-Pagination Limit**: Set the maximum number of pages the script will automatically fetch continuously when content is sparse (0-10).
+* **Debug Mode**: When enabled, detailed filtering logs can be viewed in the browser console (F12).
+
+<a name="privacy"></a>
+
+## 🛡️ Permissions & Privacy
+
+### Why is "Access to all websites" permission required?
+
+Since Misskey instances are distributed across thousands of different domains, the script needs to check the `meta` tags in the webpage header to confirm if the current site is running Misskey.
+
+1. **Silent Detection**: The script checks only once when the page loads. If the current site is not Misskey, the script stops running immediately and completely.
+2. **Zero Data Upload**: All filtering logic and whitelist data are stored locally in your browser (`GM_setValue`). Your browsing history or personal information is **never** uploaded to any server.
+3. **Fully Open Source**: You can view and audit every line of source code on GitHub at any time.
+
+## 🔗 Project Links
+
+If you find this script helpful, you are welcome to support it in the following ways:
+
+* **Project Homepage**: [📦 GitHub Repository](https://github.com/Jarvie8176/misskey-instance-filter)
+* **Feedback**: [🐛 Submit an Issue](https://github.com/Jarvie8176/misskey-instance-filter/issues)
+* **Support the Author**: [☕ Buy me a coffee on Ko-fi](https://ko-fi.com/jk433552)
+
+## ❓ FAQ
+
+**Q: What is an "Instance"?**
+A: Misskey is a decentralized social network composed of many independent servers (websites). These servers are called "instances." Users can register on different instances, but they can communicate
+with each other. The Global Timeline (GTL) displays public posts from different instances.
+
+**Q: Will this script affect posts from people I follow?**
+A: No. This script primarily affects the Global Timeline (GTL) and Social Timeline (STL). It does not filter your Home Timeline (HTL), lists, or content seen when directly visiting a user's profile
+page.
+
+**Q: I added a whitelist, but the timeline seems empty/slow?**
+A: This is normal because the script has filtered out all content from instances not on your whitelist. If you feel there is too little content, try using the "Recently Blocked Instances" feature to
+discover and add more instances you are interested in.
+
+**Q: Can I temporarily disable this script?**
+A: Yes. You can find the installed script list in the Tampermonkey extension menu of your browser, where you can temporarily toggle off "Misskey Timeline Instance Filter."
+
+---
+
+*License: [MIT*](https://github.com/Jarvie8176/misskey-instance-filter/blob/main/LICENSE)

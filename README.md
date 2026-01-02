@@ -1,3 +1,7 @@
+[中文](./README.md) | [English](./README_en.md) | [日本語](./README_jp.md)
+
+---
+
 # Misskey 实例过滤器 (Timeline Instance Filter)
 
 这是一个为 Misskey 设计的浏览器用户脚本 (Userscript)，它可以让你在浏览全局时间线 (GTL) 或社交时间线 (STL) 时，只看你感兴趣的实例（服务器）上的内容。
