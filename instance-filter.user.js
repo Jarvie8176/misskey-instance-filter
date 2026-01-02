@@ -3,7 +3,7 @@
 // @name:zh-CN   Misskey 实例过滤器 (全局流/白名单)
 // @name:ja      Misskey タイムライン インスタンス フィルター
 // @namespace    https://github.com/Jarvie8176/misskey-instance-filter
-// @version      1.1.0
+// @version      1.1.1
 // @description  Filter Misskey global timeline by instances
 // @author       JarvieK
 // @license      MIT
@@ -21,18 +21,18 @@
 
     const DEFAULT_SETTINGS = {
         lang: 'auto',
-        maxPages: 5,
+        maxPages: 2,
         instanceList: '',
-        debug: true,
+        debug: false,
         wildcardSearch: false,
-        hideLocal: false // 新增：默认不隐藏本地
+        hideLocal: false
     };
 
     const TRANSLATIONS = {
         en: {
             title: "Instance Filter",
             listPlaceholder: "one.domain.per.line",
-            maxPagesLabel: "Max Auto-Fetch:",
+            maxPagesLabel: "Max Auto-Fetch (Max 10):",
             debugLabel: "Debug Mode:",
             hideLocalLabel: "Hide Local Feed:",
             langLabel: "Language:",
@@ -52,7 +52,7 @@
         zh: {
             title: "实例过滤器",
             listPlaceholder: "每行一个域名 (例如: misskey.io)",
-            maxPagesLabel: "自动翻页上限:",
+            maxPagesLabel: "自动翻页上限 (最高10):",
             debugLabel: "调试模式:",
             hideLocalLabel: "隐藏本地内容:",
             langLabel: "界面语言:",
@@ -72,7 +72,7 @@
         ja: {
             title: "インスタンスフィルター",
             listPlaceholder: "1行に1つのドメイン (例: misskey.io)",
-            maxPagesLabel: "自動取得上限:",
+            maxPagesLabel: "自動取得上限 (最大10):",
             debugLabel: "デバッグモード:",
             hideLocalLabel: "ローカルを非表示:",
             langLabel: "表示言語:",
@@ -106,7 +106,15 @@
 
     if (hasMisskeyMeta()) {
         init();
-        return;
+    } else {
+        const observer = new MutationObserver((mutations) => {
+            if (hasMisskeyMeta()) {
+                observer.disconnect();
+                init();
+            }
+        });
+        observer.observe(document.documentElement, {childList: true, subtree: true});
+        setTimeout(() => observer.disconnect(), 5000);
     }
 
     function getCurrentI18n() {
@@ -139,13 +147,12 @@
 
         const config = {
             allowedInstances: GM_getValue('mk_filter_list', DEFAULT_SETTINGS.instanceList).split('\n').map(l => l.trim().toLowerCase()).filter(Boolean),
-            maxAutoFetchPages: parseInt(GM_getValue('mk_filter_max_pages', DEFAULT_SETTINGS.maxPages), 10),
+            maxAutoFetchPages: Math.min(10, parseInt(GM_getValue('mk_filter_max_pages', DEFAULT_SETTINGS.maxPages), 10)),
             debug: isDebug,
-            hideLocal: GM_getValue('mk_filter_hide_local', DEFAULT_SETTINGS.hideLocal), // 传入配置
+            hideLocal: GM_getValue('mk_filter_hide_local', DEFAULT_SETTINGS.hideLocal),
             localHost: localHost,
             labels: i18n
         };
-        // 只有在不隐藏本地的情况下，才自动把当前实例加入白名单
         if (!config.hideLocal && !config.allowedInstances.includes(localHost)) {
             config.allowedInstances.push(localHost);
         }
@@ -156,27 +163,17 @@
             const cfg = window.MK_FILTER_CONFIG;
             let globalContinuousFilteredCount = 0;
 
-            if (cfg.debug) console.log('[MK Filter] Script Injected. Config:', cfg);
-
             function isNoteAllowed(note) {
                 try {
                     if (!note) return true;
                     const user = note.renote?.user || note.user;
                     const host = (user?.host || '').toLowerCase();
-
-                    // 处理本地贴 (host 为空)
                     if (!host) {
-                        if (cfg.hideLocal) {
-                            if (cfg.debug) console.log(`[MK Filter] 🚫 Blocked Local Post: @${user.username}`);
-                            return false;
-                        }
+                        if (cfg.hideLocal) return false;
                         return true;
                     }
-
-                    // 处理远程贴
                     const isAllowed = cfg.allowedInstances.includes(host);
                     if (!isAllowed) {
-                        if (cfg.debug) console.log(`[MK Filter] 🚫 Blocked: @${user.username}@${host}`);
                         window.dispatchEvent(new CustomEvent('mk-filter-blocked-event', {detail: host}));
                     }
                     return isAllowed;
@@ -197,7 +194,6 @@
                 }];
             }
 
-            // WebSocket Filtering
             const WS_Proto = window.WebSocket.prototype;
             const originalAddEventListener = WS_Proto.addEventListener;
             WS_Proto.addEventListener = function (type, listener, options) {
@@ -217,13 +213,10 @@
                 return originalAddEventListener.call(this, type, listener, options);
             };
 
-            // Fetch API Filtering
             const originalFetch = window.fetch;
             window.fetch = async function (...args) {
                 const url = typeof args[0] === 'string' ? args[0] : args[0].url;
                 if (!url || !url.includes('/api/notes/') || !url.includes('-timeline')) return originalFetch(...args);
-
-                if (cfg.debug) console.log(`[MK Filter] 🛰️ Intercepting Timeline Fetch: ${url}`);
 
                 let isRefreshRequest = false;
                 try {
@@ -245,21 +238,14 @@
                     if (!Array.isArray(data)) return response;
 
                     const filtered = data.filter(isNoteAllowed);
-
                     if (filtered.length > 0) {
-                        if (cfg.debug) console.log(`[MK Filter] ✅ Passed ${filtered.length}/${data.length} notes.`);
                         globalContinuousFilteredCount = 0;
                         return new Response(JSON.stringify(filtered), {status: 200, headers: response.headers});
                     }
+                    if (isRefreshRequest) return new Response(JSON.stringify([]), {status: 200, headers: response.headers});
 
-                    if (isRefreshRequest) {
-                        if (cfg.debug) console.log(`[MK Filter] ⏳ Refresh yielded 0 results after filtering. Silencing.`);
-                        return new Response(JSON.stringify([]), {status: 200, headers: response.headers});
-                    }
-
-                    if (data.length > 0 && currentReqPageCount <= cfg.maxAutoFetchPages) {
+                    if (data.length > 0 && currentReqPageCount < cfg.maxAutoFetchPages) {
                         const lastId = data[data.length - 1].id;
-                        if (cfg.debug) console.log(`[MK Filter] 🔄 Page ${currentReqPageCount} empty after filtering. Auto-fetching next... (untilId: ${lastId})`);
                         const nextArgs = [...fArgs];
                         try {
                             const body = JSON.parse(nextArgs[1].body);
@@ -273,12 +259,10 @@
                     if (data.length > 0) {
                         globalContinuousFilteredCount += currentReqPageCount;
                         const lastId = data[data.length - 1].id;
-                        if (cfg.debug) console.log(`[MK Filter] 🛑 Max auto-fetch reached. Displaying placeholder.`);
                         return new Response(JSON.stringify(createPlaceholder(lastId, globalContinuousFilteredCount)), {status: 200, headers: response.headers});
                     }
                     return response;
                 };
-
                 return fetchLoop(args, 1);
             };
         }
@@ -290,7 +274,6 @@
 
         const blockedInstancesInUi = new Set();
         window.addEventListener('load', () => {
-            if (!isDebug) return;
             GM_addStyle(`
                 #mk-f-btn{position:fixed;bottom:20px;right:20px;z-index:99999;width:34px;height:34px;border-radius:50%;background:#31748f;color:#fff;border:none;cursor:pointer;opacity:0.6;transition:0.3s;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,0.3)}
                 #mk-f-btn:hover{opacity:1;transform:scale(1.1)}
@@ -318,12 +301,7 @@
                     <div style="font-weight:bold;font-size:15px;margin-bottom:10px;color:#31748f;display:flex;align-items:center;gap:5px;">
                         <span>🛡️ ${i18n.title}</span>
                     </div>
-
-                    <!-- 1. 白名单编辑器 -->
-                    <div style="font-weight:bold;font-size:12px;margin-bottom:5px;opacity:0.8">${i18n.listPlaceholder.split('(')[0]}</div>
                     <textarea id="mk-f-list" rows="5" placeholder="${i18n.listPlaceholder}"></textarea>
-
-                    <!-- 2. 最近拦截 (辅助工具) -->
                     <div class="mk-f-blocked-area">
                         <div style="font-weight:bold;font-size:12px;margin-bottom:5px;">🕒 ${i18n.blockedTitle}</div>
                         <div class="mk-f-search-container">
@@ -334,10 +312,7 @@
                         </div>
                         <div id="mk-f-blocked-list" class="mk-f-blocked-list"></div>
                     </div>
-
                     <div style="height:1px; background:rgba(128,128,128,0.1); margin:15px 0 10px 0;"></div>
-
-                    <!-- 3. 环境与高级设置 -->
                     <div class="mk-f-row">
                         <span>🌐 ${i18n.langLabel}</span>
                         <select id="mk-f-lang">
@@ -349,27 +324,19 @@
                     </div>
                     <div class="mk-f-row">
                         <span>📄 ${i18n.maxPagesLabel}</span>
-                        <input type="number" id="mk-f-pages" style="width:45px" min="0" max="20">
+                        <input type="number" id="mk-f-pages" style="width:45px" min="0" max="10">
+                    </div>
+                    <div class="mk-f-row">
+                        <span>🏠 ${i18n.hideLocalLabel}</span>
+                        <input type="checkbox" id="mk-f-hide-local-toggle">
                     </div>
                     <div class="mk-f-row">
                         <span>🐛 ${i18n.debugLabel}</span>
                         <input type="checkbox" id="mk-f-debug-toggle">
                     </div>
-
-                    <!-- 4. 动作按钮 -->
                     <div class="mk-f-btns">
                         <button id="mk-f-save">${i18n.saveBtn}</button>
                         <button id="mk-f-cancel">${i18n.cancelBtn}</button>
-                    </div>
-
-                    <!-- 5. 开发者支持链接 (页脚) -->
-                    <div style="margin-top:15px; padding-top:10px; border-top:1px solid rgba(128,128,128,0.05); display:flex; justify-content:center; gap:12px; opacity:0.6; font-size:11px;">
-                        <a href="https://ko-fi.com/jk433552" target="_blank" title="Support me on Ko-fi" style="color:inherit; text-decoration:none; display:flex; align-items:center; gap:3px;">
-                            ☕ Ko-fi
-                        </a>
-                        <a href="https://pari.cafe/@pharmakon05" target="_blank" title="Follow me on Fediverse" style="color:inherit; text-decoration:none; display:flex; align-items:center; gap:3px;">
-                            🐘 Fedi
-                        </a>
                     </div>
                 </div>
             `;
@@ -386,21 +353,20 @@
                 const query = searchInput.value.trim();
                 const isWildcard = wildcardToggle.checked;
                 const matchPredicate = getSearchPredicate(query, isWildcard);
-                const itemsToRender = Array.from(blockedInstancesInUi)
+                Array.from(blockedInstancesInUi)
                     .filter(domain => !currentAllowed.includes(domain) && matchPredicate(domain))
-                    .sort((a, b) => a.localeCompare(b));
-                itemsToRender.forEach(domain => {
-                    const item = document.createElement('div');
-                    item.className = 'mk-f-blocked-item';
-                    item.innerHTML = `<span>${domain}</span><button class="mk-f-add-btn" data-domain="${domain}">${i18n.addBtn} +</button>`;
-                    blockedListDiv.appendChild(item);
-                });
+                    .sort((a, b) => a.localeCompare(b))
+                    .forEach(domain => {
+                        const item = document.createElement('div');
+                        item.className = 'mk-f-blocked-item';
+                        item.innerHTML = `<span>${domain}</span><button class="mk-f-add-btn" data-domain="${domain}">${i18n.addBtn} +</button>`;
+                        blockedListDiv.appendChild(item);
+                    });
                 blockedListDiv.querySelectorAll('.mk-f-add-btn').forEach(b => {
                     b.onclick = (e) => {
                         const domain = e.target.getAttribute('data-domain');
                         const v = listInput.value.trim();
                         listInput.value = v ? v + '\n' + domain : domain;
-                        blockedInstancesInUi.delete(domain);
                         renderBlocked();
                     };
                 });
@@ -425,6 +391,7 @@
                     listInput.value = GM_getValue('mk_filter_list', DEFAULT_SETTINGS.instanceList);
                     document.getElementById('mk-f-pages').value = GM_getValue('mk_filter_max_pages', DEFAULT_SETTINGS.maxPages);
                     document.getElementById('mk-f-debug-toggle').checked = GM_getValue('mk_filter_debug', DEFAULT_SETTINGS.debug);
+                    document.getElementById('mk-f-hide-local-toggle').checked = GM_getValue('mk_filter_hide_local', DEFAULT_SETTINGS.hideLocal);
                     document.getElementById('mk-f-lang').value = GM_getValue('mk_filter_lang', DEFAULT_SETTINGS.lang);
                     wildcardToggle.checked = GM_getValue('mk_filter_wildcard', DEFAULT_SETTINGS.wildcardSearch);
                     searchInput.value = '';
@@ -437,8 +404,11 @@
             };
 
             document.getElementById('mk-f-save').onclick = () => {
+                const rawPages = parseInt(document.getElementById('mk-f-pages').value, 10) || 0;
+                const clampedPages = Math.min(10, Math.max(0, rawPages)); // 强制校验：0-10之间
+
                 GM_setValue('mk_filter_list', listInput.value);
-                GM_setValue('mk_filter_max_pages', document.getElementById('mk-f-pages').value);
+                GM_setValue('mk_filter_max_pages', clampedPages);
                 GM_setValue('mk_filter_debug', document.getElementById('mk-f-debug-toggle').checked);
                 GM_setValue('mk_filter_hide_local', document.getElementById('mk-f-hide-local-toggle').checked);
                 GM_setValue('mk_filter_lang', document.getElementById('mk-f-lang').value);
