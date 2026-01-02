@@ -177,7 +177,7 @@
                     const isAllowed = cfg.allowedInstances.includes(host);
                     if (!isAllowed) {
                         if (cfg.debug) console.log(`[MK Filter] 🚫 Blocked: @${user.username}@${host}`);
-                        window.dispatchEvent(new CustomEvent('mk-filter-blocked-event', { detail: host }));
+                        window.dispatchEvent(new CustomEvent('mk-filter-blocked-event', {detail: host}));
                     }
                     return isAllowed;
                 } catch (e) {
@@ -249,12 +249,12 @@
                     if (filtered.length > 0) {
                         if (cfg.debug) console.log(`[MK Filter] ✅ Passed ${filtered.length}/${data.length} notes.`);
                         globalContinuousFilteredCount = 0;
-                        return new Response(JSON.stringify(filtered), { status: 200, headers: response.headers });
+                        return new Response(JSON.stringify(filtered), {status: 200, headers: response.headers});
                     }
 
                     if (isRefreshRequest) {
                         if (cfg.debug) console.log(`[MK Filter] ⏳ Refresh yielded 0 results after filtering. Silencing.`);
-                        return new Response(JSON.stringify([]), { status: 200, headers: response.headers });
+                        return new Response(JSON.stringify([]), {status: 200, headers: response.headers});
                     }
 
                     if (data.length > 0 && currentReqPageCount <= cfg.maxAutoFetchPages) {
@@ -274,7 +274,7 @@
                         globalContinuousFilteredCount += currentReqPageCount;
                         const lastId = data[data.length - 1].id;
                         if (cfg.debug) console.log(`[MK Filter] 🛑 Max auto-fetch reached. Displaying placeholder.`);
-                        return new Response(JSON.stringify(createPlaceholder(lastId, globalContinuousFilteredCount)), { status: 200, headers: response.headers });
+                        return new Response(JSON.stringify(createPlaceholder(lastId, globalContinuousFilteredCount)), {status: 200, headers: response.headers});
                     }
                     return response;
                 };
