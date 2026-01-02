@@ -8,6 +8,8 @@
 
 如果你觉得时间线上无关信息太多，只想关注特定圈子的讨论，这个脚本会非常有用。它通过一个“白名单”系统工作，只有在名单上的实例发布的内容才会被显示。
 
+<img width="1710" height="977" alt="image" src="https://github.com/user-attachments/assets/95d23213-4b41-489b-adab-6b15db78078e" />
+
 > **给极度注重隐私用户的建议**（[隐私说明](#privacy)）：
 > 如果您不希望脚本在所有网站运行，您可以手动在脚本管理器（Tampermonkey）的设置页面，将“用户匹配 (User Matches)”修改为您常用的 Misskey 实例域名。但这会导致脚本失去自动识别新实例的能力。
 
