@@ -10,6 +10,7 @@
 // @author              JarvieK
 // @license             MIT
 // @match               *://*/*
+// @match               *://misskey.io/*
 // @include             *
 // @icon                https://misskey-hub.net/favicon.ico
 // @grant               GM_setValue
